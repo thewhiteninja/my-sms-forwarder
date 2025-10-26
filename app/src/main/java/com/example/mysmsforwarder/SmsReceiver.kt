@@ -19,23 +19,25 @@ class SmsReceiver : BroadcastReceiver() {
         if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
             val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
             val database = AppDatabase.getDatabase(context)
-            
+
             CoroutineScope(Dispatchers.IO).launch {
                 val enabledFilters = database.smsFilterDao().getEnabledFilters()
-                
+
                 for (smsMessage in messages) {
                     val sender = smsMessage.displayOriginatingAddress
                     val messageBody = smsMessage.messageBody
-                    
+
                     for (filter in enabledFilters) {
                         val matches = when {
-                            filter.senderNumber.isNotEmpty() && 
-                                sender.contains(filter.senderNumber) -> true
-                            filter.senderName.isNotEmpty() && 
-                                sender.contains(filter.senderName, ignoreCase = true) -> true
+                            filter.senderNumber.isNotEmpty() &&
+                                    sender.contains(filter.senderNumber) -> true
+
+                            filter.senderName.isNotEmpty() &&
+                                    sender.contains(filter.senderName, ignoreCase = true) -> true
+
                             else -> false
                         }
-                        
+
                         if (matches) {
                             val success = forwardSms(
                                 context,
@@ -43,8 +45,8 @@ class SmsReceiver : BroadcastReceiver() {
                                 sender,
                                 messageBody
                             )
-                            
-                            // Enregistrer dans l'historique
+
+                            // Save to history
                             database.forwardingHistoryDao().insertHistory(
                                 ForwardingHistory(
                                     filterId = filter.id,
@@ -55,8 +57,8 @@ class SmsReceiver : BroadcastReceiver() {
                                     success = success
                                 )
                             )
-                            
-                            // Afficher notification
+
+                            // Show notification
                             showNotification(
                                 context,
                                 filter.name,
@@ -64,15 +66,15 @@ class SmsReceiver : BroadcastReceiver() {
                                 filter.forwardToNumber,
                                 success
                             )
-                            
-                            break // Un seul filtre par SMS
+
+                            break // Only one filter per SMS
                         }
                     }
                 }
             }
         }
     }
-    
+
     private fun forwardSms(
         context: Context,
         destinationNumber: String,
@@ -81,8 +83,8 @@ class SmsReceiver : BroadcastReceiver() {
     ): Boolean {
         return try {
             val smsManager = context.getSystemService(SmsManager::class.java)
-            val forwardedMessage = "SMS de $originalSender:\n$message"
-            
+            val forwardedMessage = "SMS from $originalSender:\n$message"
+
             smsManager.sendTextMessage(
                 destinationNumber,
                 null,
@@ -96,7 +98,7 @@ class SmsReceiver : BroadcastReceiver() {
             false
         }
     }
-    
+
     private fun showNotification(
         context: Context,
         filterName: String,
@@ -104,8 +106,9 @@ class SmsReceiver : BroadcastReceiver() {
         forwardedTo: String,
         success: Boolean
     ) {
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        
+        val notificationManager =
+            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
         val intent = Intent(context, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -113,16 +116,16 @@ class SmsReceiver : BroadcastReceiver() {
             intent,
             PendingIntent.FLAG_IMMUTABLE
         )
-        
+
         val notification = NotificationCompat.Builder(context, "sms_forwarding")
             .setSmallIcon(android.R.drawable.ic_dialog_email)
-            .setContentTitle(if (success) "SMS transféré" else "Échec du transfert")
+            .setContentTitle(if (success) "SMS forwarded" else "Forwarding failed")
             .setContentText("$filterName: $sender → $forwardedTo")
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()
-        
+
         notificationManager.notify(System.currentTimeMillis().toInt(), notification)
     }
 }

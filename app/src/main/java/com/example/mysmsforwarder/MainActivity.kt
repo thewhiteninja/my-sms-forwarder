@@ -1,67 +1,124 @@
 package com.example.mysmsforwarder
 
-import android.app.AlertDialog
-import android.content.Intent
-import android.net.Uri
-import android.provider.Settings
-
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.mysmsforwarder.data.*
+import com.example.mysmsforwarder.data.AppDatabase
+import com.example.mysmsforwarder.data.ForwardingHistory
+import com.example.mysmsforwarder.data.SmsFilter
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private lateinit var database: AppDatabase
+    private var showPermissionDialog by mutableStateOf(false)
+    private var deniedPermissions by mutableStateOf<Set<String>>(emptySet())
 
     private val requestPermissions = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         val allGranted = permissions.values.all { it }
         if (!allGranted) {
-            val deniedPermissions = permissions.filterValues { !it }.keys
-            val message = buildString {
-                append("L'application nécessite les permissions suivantes pour fonctionner :\n\n")
-                deniedPermissions.forEach { permission ->
-                    when (permission) {
-                        Manifest.permission.RECEIVE_SMS -> append("• Réception de SMS : pour détecter les messages entrants\n")
-                        Manifest.permission.SEND_SMS -> append("• Envoi de SMS : pour transférer les messages\n")
-                        Manifest.permission.READ_SMS -> append("• Lecture de SMS : pour lire le contenu des messages\n")
-                        Manifest.permission.POST_NOTIFICATIONS -> append("• Notifications : pour vous informer des transferts\n")
-                    }
-                }
-                append("\nVeuillez activer ces permissions dans les paramètres.")
-            }
+            deniedPermissions = permissions.filterValues { !it }.keys
+            showPermissionDialog = true
+        }
+    }
 
-            AlertDialog.Builder(this)
-                .setTitle("Permissions requises")
-                .setMessage(message)
-                .setPositiveButton("Paramètres") { _, _ ->
-                    openAppSettings()
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        database = AppDatabase.getDatabase(applicationContext)
+        createNotificationChannel()
+
+        requestPermissions.launch(arrayOf(
+            Manifest.permission.RECEIVE_SMS,
+            Manifest.permission.SEND_SMS,
+            Manifest.permission.READ_SMS,
+            Manifest.permission.POST_NOTIFICATIONS
+        ))
+
+        setContent {
+            MaterialTheme {
+                SmsForwarderApp(database)
+
+                if (showPermissionDialog) {
+                    PermissionDialog(
+                        deniedPermissions = deniedPermissions,
+                        onDismiss = { showPermissionDialog = false },
+                        onOpenSettings = {
+                            openAppSettings()
+                            showPermissionDialog = false
+                        }
+                    )
                 }
-                .setNegativeButton("Plus tard", null)
-                .setCancelable(false)
-                .show()
+            }
         }
     }
 
@@ -72,36 +129,13 @@ class MainActivity : ComponentActivity() {
         startActivity(intent)
     }
 
-    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        database = AppDatabase.getDatabase(applicationContext)
-        createNotificationChannel()
-
-        requestPermissions.launch(
-            arrayOf(
-                Manifest.permission.RECEIVE_SMS,
-                Manifest.permission.SEND_SMS,
-                Manifest.permission.READ_SMS,
-                Manifest.permission.POST_NOTIFICATIONS
-            )
-        )
-
-        setContent {
-            MaterialTheme {
-                SmsForwarderApp(database)
-            }
-        }
-    }
-
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             "sms_forwarding",
-            "Transfert SMS",
+            "SMS Forwarding",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
-            description = "Notifications de transfert SMS"
+            description = "SMS forwarding notifications"
         }
 
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
@@ -109,20 +143,74 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+@Composable
+fun PermissionDialog(
+    deniedPermissions: Set<String>,
+    onDismiss: () -> Unit,
+    onOpenSettings: () -> Unit
+) {
+    val permissionMessages = mapOf(
+        Manifest.permission.RECEIVE_SMS to "Receive SMS: to detect incoming messages",
+        Manifest.permission.SEND_SMS to "Send SMS: to forward messages",
+        Manifest.permission.READ_SMS to "Read SMS: to read message content",
+        Manifest.permission.POST_NOTIFICATIONS to "Notifications: to inform you about forwarding"
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.Warning, null) },
+        title = { Text("Permissions Required") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("This app requires the following permissions to function:")
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                deniedPermissions.forEach { permission ->
+                    permissionMessages[permission]?.let { message ->
+                        Row(verticalAlignment = Alignment.Top) {
+                            Text("• ", style = MaterialTheme.typography.bodyMedium)
+                            Text(message, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    "Please enable these permissions in settings.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onOpenSettings) {
+                Text("Settings")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Later")
+            }
+        }
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SmsForwarderApp(database: AppDatabase) {
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedTab by remember { mutableStateOf(0) }
     val filters by database.smsFilterDao().getAllFilters().collectAsState(initial = emptyList())
-    val history by database.forwardingHistoryDao().getRecentHistory()
-        .collectAsState(initial = emptyList())
+    val history by database.forwardingHistoryDao().getRecentHistory().collectAsState(initial = emptyList())
     var showAddDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Transfert SMS") },
+                title = { Text("SMS Forwarder") },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
@@ -131,7 +219,7 @@ fun SmsForwarderApp(database: AppDatabase) {
         floatingActionButton = {
             if (selectedTab == 0) {
                 FloatingActionButton(onClick = { showAddDialog = true }) {
-                    Icon(Icons.Default.Add, "Ajouter filtre")
+                    Icon(Icons.Default.Add, "Add filter")
                 }
             }
         }
@@ -145,13 +233,13 @@ fun SmsForwarderApp(database: AppDatabase) {
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("Filtres") },
+                    text = { Text("Filters") },
                     icon = { Icon(Icons.Default.FilterList, null) }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("Historique") },
+                    text = { Text("History") },
                     icon = { Icon(Icons.Default.History, null) }
                 )
             }
@@ -196,12 +284,12 @@ fun FiltersScreen(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    "Aucun filtre configuré",
+                    "No filters configured",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    "Appuyez sur + pour ajouter",
+                    "Tap + to add one",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -250,7 +338,7 @@ fun HistoryScreen(history: List<ForwardingHistory>) {
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    "Aucun historique",
+                    "No history",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -317,7 +405,7 @@ fun FilterCard(
                 Icon(Icons.Default.Person, null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "De: ${filter.senderNumber.ifEmpty { filter.senderName }}",
+                    text = "From: ${filter.senderNumber.ifEmpty { filter.senderName }}",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -328,7 +416,7 @@ fun FilterCard(
                 Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "Vers: ${filter.forwardToNumber}",
+                    text = "To: ${filter.forwardToNumber}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -345,7 +433,7 @@ fun FilterCard(
             ) {
                 Icon(Icons.Default.Delete, null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Supprimer")
+                Text("Delete")
             }
         }
     }
@@ -421,7 +509,7 @@ fun AddFilterDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Default.Add, null) },
-        title = { Text("Nouveau filtre") },
+        title = { Text("New Filter") },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -429,7 +517,7 @@ fun AddFilterDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Nom du filtre") },
+                    label = { Text("Filter name") },
                     leadingIcon = { Icon(Icons.AutoMirrored.Filled.Label, null) },
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -437,19 +525,19 @@ fun AddFilterDialog(
                 OutlinedTextField(
                     value = senderNumber,
                     onValueChange = { senderNumber = it },
-                    label = { Text("Numéro émetteur") },
+                    label = { Text("Sender number") },
                     placeholder = { Text("+33612345678") },
                     leadingIcon = { Icon(Icons.Default.Phone, null) },
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Text("OU", style = MaterialTheme.typography.labelSmall)
+                Text("OR", style = MaterialTheme.typography.labelSmall)
 
                 OutlinedTextField(
                     value = senderName,
                     onValueChange = { senderName = it },
-                    label = { Text("Nom émetteur") },
-                    placeholder = { Text("Ex: BANK, UBER") },
+                    label = { Text("Sender name") },
+                    placeholder = { Text("e.g. BANK, UBER") },
                     leadingIcon = { Icon(Icons.Default.Person, null) },
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -457,7 +545,7 @@ fun AddFilterDialog(
                 OutlinedTextField(
                     value = forwardTo,
                     onValueChange = { forwardTo = it },
-                    label = { Text("Transférer vers *") },
+                    label = { Text("Forward to *") },
                     placeholder = { Text("+33698765432") },
                     leadingIcon = { Icon(Icons.AutoMirrored.Filled.Send, null) },
                     modifier = Modifier.fillMaxWidth()
@@ -468,8 +556,7 @@ fun AddFilterDialog(
             Button(
                 onClick = {
                     if (name.isNotEmpty() && forwardTo.isNotEmpty() &&
-                        (senderNumber.isNotEmpty() || senderName.isNotEmpty())
-                    ) {
+                        (senderNumber.isNotEmpty() || senderName.isNotEmpty())) {
                         onAdd(
                             SmsFilter(
                                 name = name,
@@ -483,12 +570,12 @@ fun AddFilterDialog(
                 enabled = name.isNotEmpty() && forwardTo.isNotEmpty() &&
                         (senderNumber.isNotEmpty() || senderName.isNotEmpty())
             ) {
-                Text("Ajouter")
+                Text("Add")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Annuler")
+                Text("Cancel")
             }
         }
     )
