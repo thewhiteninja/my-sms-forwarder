@@ -27,3 +27,13 @@ data class ForwardingHistory(
     val timestamp: Long = System.currentTimeMillis(),
     val success: Boolean = true
 )
+
+@Entity(tableName = "app_logs")
+data class AppLog(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val level: String, // DEBUG, INFO, WARNING, ERROR
+    val tag: String,
+    val message: String,
+    val timestamp: Long = System.currentTimeMillis()
+)

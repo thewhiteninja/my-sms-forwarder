@@ -1,5 +1,6 @@
 package com.example.mysmsforwarder
 
+import android.app.Activity
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -7,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
 import android.telephony.SmsManager
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.mysmsforwarder.data.AppDatabase
 import com.example.mysmsforwarder.data.ForwardingHistory
@@ -75,6 +77,20 @@ class SmsReceiver : BroadcastReceiver() {
         }
     }
 
+    fun getResultCodeString(resultCode: Int): String {
+        return when (resultCode) {
+            Activity.RESULT_OK -> "SMS envoyé avec succès"
+            SmsManager.RESULT_ERROR_GENERIC_FAILURE -> "Erreur générique"
+            SmsManager.RESULT_ERROR_RADIO_OFF -> "Radio éteinte"
+            SmsManager.RESULT_ERROR_NULL_PDU -> "PDU null"
+            SmsManager.RESULT_ERROR_NO_SERVICE -> "Pas de service"
+            SmsManager.RESULT_ERROR_LIMIT_EXCEEDED -> "Limite dépassée"
+            SmsManager.RESULT_ERROR_SHORT_CODE_NOT_ALLOWED -> "Code court non autorisé"
+            SmsManager.RESULT_ERROR_SHORT_CODE_NEVER_ALLOWED -> "Code court jamais autorisé"
+            else -> "Code inconnu: $resultCode"
+        }
+    }
+
     private fun forwardSms(
         context: Context,
         destinationNumber: String,
@@ -95,6 +111,7 @@ class SmsReceiver : BroadcastReceiver() {
             true
         } catch (e: Exception) {
             e.printStackTrace()
+            Log.e("SmsReceiver", "forwardSMS failed", e)
             false
         }
     }
