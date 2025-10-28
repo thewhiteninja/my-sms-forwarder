@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -487,7 +489,7 @@ fun FilterCard(
             Spacer(modifier = Modifier.height(4.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Send, null, modifier = Modifier.size(16.dp))
+                Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = "To: ${filter.forwardToNumber}",
@@ -592,7 +594,7 @@ fun AddFilterDialog(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Filter name") },
-                    leadingIcon = { Icon(Icons.Default.Label, null) },
+                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.Label, null) },
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -621,7 +623,7 @@ fun AddFilterDialog(
                     onValueChange = { forwardTo = it },
                     label = { Text("Forward to *") },
                     placeholder = { Text("+33698765432") },
-                    leadingIcon = { Icon(Icons.Default.Send, null) },
+                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.Send, null) },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
