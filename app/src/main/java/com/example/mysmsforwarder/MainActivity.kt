@@ -3,22 +3,17 @@ package com.example.mysmsforwarder
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Label
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -45,7 +40,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -54,14 +48,12 @@ class MainActivity : ComponentActivity() {
         Logger.i("MainActivity", "App started")
         createNotificationChannel()
 
-        requestPermissions.launch(
-            arrayOf(
-                Manifest.permission.RECEIVE_SMS,
-                Manifest.permission.SEND_SMS,
-                Manifest.permission.READ_SMS,
-                Manifest.permission.POST_NOTIFICATIONS
-            )
-        )
+        requestPermissions.launch(arrayOf(
+            Manifest.permission.RECEIVE_SMS,
+            Manifest.permission.SEND_SMS,
+            Manifest.permission.READ_SMS,
+            Manifest.permission.POST_NOTIFICATIONS
+        ))
 
         setContent {
             MaterialTheme {
@@ -97,13 +89,11 @@ class MainActivity : ComponentActivity() {
             description = "SMS forwarding notifications"
         }
 
-        val notificationManager =
-            getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.createNotificationChannel(channel)
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
 fun PermissionDialog(
     deniedPermissions: Set<String>,
@@ -161,10 +151,9 @@ fun PermissionDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SmsForwarderApp(database: AppDatabase) {
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(0) }
     val filters by database.smsFilterDao().getAllFilters().collectAsState(initial = emptyList())
-    val history by database.forwardingHistoryDao().getRecentHistory()
-        .collectAsState(initial = emptyList())
+    val history by database.forwardingHistoryDao().getRecentHistory().collectAsState(initial = emptyList())
     val logs by database.appLogDao().getAllLogs().collectAsState(initial = emptyList())
     var showAddDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -172,7 +161,7 @@ fun SmsForwarderApp(database: AppDatabase) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("SMS Forwarder") },
+                title = { Text("My SMS Forwarder") },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
@@ -286,10 +275,7 @@ fun FiltersScreen(
                             database.smsFilterDao().updateFilter(
                                 filter.copy(isEnabled = newState)
                             )
-                            Logger.i(
-                                "FiltersScreen",
-                                "Filter ${filter.name} ${if (newState) "enabled" else "disabled"}"
-                            )
+                            Logger.i("FiltersScreen", "Filter ${filter.name} ${if (newState) "enabled" else "disabled"}")
                         }
                     }
                 )
@@ -501,7 +487,7 @@ fun FilterCard(
             Spacer(modifier = Modifier.height(4.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.AutoMirrored.Filled.Send, null, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.Send, null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = "To: ${filter.forwardToNumber}",
@@ -606,7 +592,7 @@ fun AddFilterDialog(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Filter name") },
-                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.Label, null) },
+                    leadingIcon = { Icon(Icons.Default.Label, null) },
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -635,7 +621,7 @@ fun AddFilterDialog(
                     onValueChange = { forwardTo = it },
                     label = { Text("Forward to *") },
                     placeholder = { Text("+33698765432") },
-                    leadingIcon = { Icon(Icons.AutoMirrored.Filled.Send, null) },
+                    leadingIcon = { Icon(Icons.Default.Send, null) },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -644,8 +630,7 @@ fun AddFilterDialog(
             Button(
                 onClick = {
                     if (name.isNotEmpty() && forwardTo.isNotEmpty() &&
-                        (senderNumber.isNotEmpty() || senderName.isNotEmpty())
-                    ) {
+                        (senderNumber.isNotEmpty() || senderName.isNotEmpty())) {
                         onAdd(
                             SmsFilter(
                                 name = name,

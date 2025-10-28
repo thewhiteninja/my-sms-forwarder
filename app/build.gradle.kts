@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.mysmsforwarder"
-        minSdk = 26
+        minSdk = 33
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
