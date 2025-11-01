@@ -27,7 +27,7 @@ class SmsReceiver : BroadcastReceiver() {
 
                 for (smsMessage in messages) {
                     val sender = smsMessage.displayOriginatingAddress
-                    val messageBody = smsMessage.messageBody
+                    var messageBody = smsMessage.messageBody
 
                     for (filter in enabledFilters) {
                         val matches = when {
@@ -40,7 +40,23 @@ class SmsReceiver : BroadcastReceiver() {
                             else -> false
                         }
 
-                        if (matches) {
+                        var codeFound = false
+                        if (sender == "TradeRepubl") {
+                            val pos = messageBody.lastIndexOf("Code")
+                            if (pos != -1) {
+                                messageBody = messageBody.substring(pos)
+                                codeFound = true
+                            }
+                        } else if (sender == "SecuriteLBP") {
+                            val pos = messageBody.lastIndexOf("secret")
+                            if (pos != -1) {
+                                val code = messageBody.substring(pos + 7, pos + 7 + 6)
+                                messageBody = "Code : $code"
+                                codeFound = true
+                            }
+                        }
+
+                        if (matches && codeFound) {
                             val success = forwardSms(
                                 context,
                                 filter.forwardToNumber,

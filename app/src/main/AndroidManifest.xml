@@ -16,7 +16,7 @@
 
     <application
         android:icon="@mipmap/ic_launcher"
-        android:label="Transfert SMS"
+        android:label="My SMS Forwarder"
         android:theme="@android:style/Theme.Material.Light">
 
         <activity
