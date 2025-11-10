@@ -1,6 +1,6 @@
 [versions]
 activityComposeVersion = "1.11.0"
-composeBomVersion = "2025.10.01"
+composeBomVersion = "2025.11.00"
 coreKtxVersion = "1.17.0"
 kotlin = "2.2.21"
 lifecycleRuntimeKtxVersion = "2.9.4"

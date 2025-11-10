@@ -50,12 +50,14 @@ class MainActivity : ComponentActivity() {
         Logger.i("MainActivity", "App started")
         createNotificationChannel()
 
-        requestPermissions.launch(arrayOf(
-            Manifest.permission.RECEIVE_SMS,
-            Manifest.permission.SEND_SMS,
-            Manifest.permission.READ_SMS,
-            Manifest.permission.POST_NOTIFICATIONS
-        ))
+        requestPermissions.launch(
+            arrayOf(
+                Manifest.permission.RECEIVE_SMS,
+                Manifest.permission.SEND_SMS,
+                Manifest.permission.READ_SMS,
+                Manifest.permission.POST_NOTIFICATIONS
+            )
+        )
 
         setContent {
             MaterialTheme {
@@ -155,7 +157,8 @@ fun PermissionDialog(
 fun SmsForwarderApp(database: AppDatabase) {
     var selectedTab by remember { mutableIntStateOf(0) }
     val filters by database.smsFilterDao().getAllFilters().collectAsState(initial = emptyList())
-    val history by database.forwardingHistoryDao().getRecentHistory().collectAsState(initial = emptyList())
+    val history by database.forwardingHistoryDao().getRecentHistory()
+        .collectAsState(initial = emptyList())
     val logs by database.appLogDao().getAllLogs().collectAsState(initial = emptyList())
     var showAddDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -277,7 +280,10 @@ fun FiltersScreen(
                             database.smsFilterDao().updateFilter(
                                 filter.copy(isEnabled = newState)
                             )
-                            Logger.i("FiltersScreen", "Filter ${filter.name} ${if (newState) "enabled" else "disabled"}")
+                            Logger.i(
+                                "FiltersScreen",
+                                "Filter ${filter.name} ${if (newState) "enabled" else "disabled"}"
+                            )
                         }
                     }
                 )
@@ -632,7 +638,8 @@ fun AddFilterDialog(
             Button(
                 onClick = {
                     if (name.isNotEmpty() && forwardTo.isNotEmpty() &&
-                        (senderNumber.isNotEmpty() || senderName.isNotEmpty())) {
+                        (senderNumber.isNotEmpty() || senderName.isNotEmpty())
+                    ) {
                         onAdd(
                             SmsFilter(
                                 name = name,

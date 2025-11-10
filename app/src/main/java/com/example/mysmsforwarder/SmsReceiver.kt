@@ -27,7 +27,7 @@ class SmsReceiver : BroadcastReceiver() {
 
                 for (smsMessage in messages) {
                     val sender = smsMessage.displayOriginatingAddress
-                    var messageBody = smsMessage.messageBody
+                    val messageBody = smsMessage.messageBody
 
                     for (filter in enabledFilters) {
                         val matches = when {
@@ -40,23 +40,7 @@ class SmsReceiver : BroadcastReceiver() {
                             else -> false
                         }
 
-                        var codeFound = false
-                        if (sender == "TradeRepubl") {
-                            val pos = messageBody.lastIndexOf("Code")
-                            if (pos != -1) {
-                                messageBody = messageBody.substring(pos)
-                                codeFound = true
-                            }
-                        } else if (sender == "SecuriteLBP") {
-                            val pos = messageBody.lastIndexOf("secret")
-                            if (pos != -1) {
-                                val code = messageBody.substring(pos + 7, pos + 7 + 6)
-                                messageBody = "Code : $code"
-                                codeFound = true
-                            }
-                        }
-
-                        if (matches && codeFound) {
+                        if (matches) {
                             val success = forwardSms(
                                 context,
                                 filter.forwardToNumber,
@@ -104,250 +88,255 @@ class SmsReceiver : BroadcastReceiver() {
             val smsManager = context.getSystemService(SmsManager::class.java)
             val forwardedMessage = "SMS from $originalSender:\n$message"
 
-            if (forwardedMessage.length > 160) {
-                Logger.w(
-                    "SmsReceiver",
-                    "Message is long (${forwardedMessage.length} chars), might be split"
+            Logger.i("SmsReceiver", "Message length: ${forwardedMessage.length} characters")
+
+            // Diviser le message si nécessaire
+            val parts = smsManager.divideMessage(forwardedMessage)
+            val partsCount = parts.size
+
+            if (partsCount > 1) {
+                Logger.w("SmsReceiver", "Message split into $partsCount parts")
+            }
+
+            // Créer les listes de PendingIntents pour chaque partie
+            val sentIntents = ArrayList<PendingIntent>()
+            val deliveredIntents = ArrayList<PendingIntent>()
+
+            for (i in 0 until partsCount) {
+                val sentIntent = Intent("SMS_SENT_$i")
+                val deliveredIntent = Intent("SMS_DELIVERED_$i")
+
+                sentIntents.add(
+                    PendingIntent.getBroadcast(
+                        context,
+                        System.currentTimeMillis().toInt() + i,
+                        sentIntent,
+                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT
+                    )
+                )
+
+                deliveredIntents.add(
+                    PendingIntent.getBroadcast(
+                        context,
+                        System.currentTimeMillis().toInt() + partsCount + i,
+                        deliveredIntent,
+                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT
+                    )
                 )
             }
 
-            // Create PendingIntents to track SMS status
-            val sentIntent = Intent("SMS_SENT")
-            val deliveredIntent = Intent("SMS_DELIVERED")
+            // Compteur pour suivre combien de parties ont été envoyées
+            var sentPartsCount = 0
+            var deliveredPartsCount = 0
 
-            val sentPendingIntent = PendingIntent.getBroadcast(
-                context,
-                System.currentTimeMillis().toInt(),
-                sentIntent,
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT
-            )
+            // Register receivers for sent status
+            for (i in 0 until partsCount) {
+                val sentReceiver = object : BroadcastReceiver() {
+                    override fun onReceive(context: Context?, intent: Intent?) {
+                        sentPartsCount++
+                        when (resultCode) {
+                            android.app.Activity.RESULT_OK -> {
+                                Logger.i(
+                                    "SmsReceiver",
+                                    "SMS part ${i + 1}/$partsCount sent successfully"
+                                )
+                                if (sentPartsCount == partsCount) {
+                                    Logger.i(
+                                        "SmsReceiver",
+                                        "All SMS parts sent successfully to $destinationNumber"
+                                    )
+                                }
+                            }
 
-            val deliveredPendingIntent = PendingIntent.getBroadcast(
-                context,
-                System.currentTimeMillis().toInt() + 1,
-                deliveredIntent,
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT
-            )
+                            SmsManager.RESULT_ERROR_GENERIC_FAILURE -> {
+                                Logger.e(
+                                    "SmsReceiver",
+                                    "Part ${i + 1}/$partsCount failed: RESULT_ERROR_GENERIC_FAILURE"
+                                )
+                            }
 
-            // Register receivers for sent and delivered status
-            val sentReceiver = object : BroadcastReceiver() {
-                override fun onReceive(context: Context?, intent: Intent?) {
-                    when (resultCode) {
-                        android.app.Activity.RESULT_OK -> {
-                            Logger.i("SmsReceiver", "SMS sent successfully to $destinationNumber")
+                            SmsManager.RESULT_ERROR_NO_SERVICE -> {
+                                Logger.e(
+                                    "SmsReceiver",
+                                    "Part ${i + 1}/$partsCount failed: RESULT_ERROR_NO_SERVICE - No service"
+                                )
+                            }
+
+                            SmsManager.RESULT_ERROR_NULL_PDU -> {
+                                Logger.e(
+                                    "SmsReceiver",
+                                    "Part ${i + 1}/$partsCount failed: RESULT_ERROR_NULL_PDU"
+                                )
+                            }
+
+                            SmsManager.RESULT_ERROR_RADIO_OFF -> {
+                                Logger.e(
+                                    "SmsReceiver",
+                                    "Part ${i + 1}/$partsCount failed: RESULT_ERROR_RADIO_OFF - Airplane mode?"
+                                )
+                            }
+
+                            SmsManager.RESULT_ERROR_LIMIT_EXCEEDED -> {
+                                Logger.e(
+                                    "SmsReceiver",
+                                    "Part ${i + 1}/$partsCount failed: RESULT_ERROR_LIMIT_EXCEEDED"
+                                )
+                            }
+
+                            SmsManager.RESULT_NETWORK_REJECT -> {
+                                Logger.e(
+                                    "SmsReceiver",
+                                    "Part ${i + 1}/$partsCount failed: RESULT_NETWORK_REJECT"
+                                )
+                            }
+
+                            SmsManager.RESULT_NETWORK_ERROR -> {
+                                Logger.e(
+                                    "SmsReceiver",
+                                    "Part ${i + 1}/$partsCount failed: RESULT_NETWORK_ERROR"
+                                )
+                            }
+
+                            SmsManager.RESULT_NO_MEMORY -> {
+                                Logger.e(
+                                    "SmsReceiver",
+                                    "Part ${i + 1}/$partsCount failed: RESULT_NO_MEMORY"
+                                )
+                            }
+
+                            SmsManager.RESULT_INVALID_SMS_FORMAT -> {
+                                Logger.e(
+                                    "SmsReceiver",
+                                    "Part ${i + 1}/$partsCount failed: RESULT_INVALID_SMS_FORMAT"
+                                )
+                            }
+
+                            SmsManager.RESULT_SYSTEM_ERROR -> {
+                                Logger.e(
+                                    "SmsReceiver",
+                                    "Part ${i + 1}/$partsCount failed: RESULT_SYSTEM_ERROR"
+                                )
+                            }
+
+                            SmsManager.RESULT_MODEM_ERROR -> {
+                                Logger.e(
+                                    "SmsReceiver",
+                                    "Part ${i + 1}/$partsCount failed: RESULT_MODEM_ERROR"
+                                )
+                            }
+
+                            SmsManager.RESULT_ENCODING_ERROR -> {
+                                Logger.e(
+                                    "SmsReceiver",
+                                    "Part ${i + 1}/$partsCount failed: RESULT_ENCODING_ERROR"
+                                )
+                            }
+
+                            SmsManager.RESULT_INVALID_SMSC_ADDRESS -> {
+                                Logger.e(
+                                    "SmsReceiver",
+                                    "Part ${i + 1}/$partsCount failed: RESULT_INVALID_SMSC_ADDRESS"
+                                )
+                            }
+
+                            SmsManager.RESULT_OPERATION_NOT_ALLOWED -> {
+                                Logger.e(
+                                    "SmsReceiver",
+                                    "Part ${i + 1}/$partsCount failed: RESULT_OPERATION_NOT_ALLOWED"
+                                )
+                            }
+
+                            SmsManager.RESULT_INTERNAL_ERROR -> {
+                                Logger.e(
+                                    "SmsReceiver",
+                                    "Part ${i + 1}/$partsCount failed: RESULT_INTERNAL_ERROR"
+                                )
+                            }
+
+                            SmsManager.RESULT_NO_RESOURCES -> {
+                                Logger.e(
+                                    "SmsReceiver",
+                                    "Part ${i + 1}/$partsCount failed: RESULT_NO_RESOURCES"
+                                )
+                            }
+
+                            SmsManager.RESULT_CANCELLED -> {
+                                Logger.w(
+                                    "SmsReceiver",
+                                    "Part ${i + 1}/$partsCount cancelled: RESULT_CANCELLED"
+                                )
+                            }
+
+                            else -> {
+                                Logger.e(
+                                    "SmsReceiver",
+                                    "Part ${i + 1}/$partsCount failed: Unknown code $resultCode"
+                                )
+                            }
                         }
-
-                        SmsManager.RESULT_ERROR_GENERIC_FAILURE -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: RESULT_ERROR_GENERIC_FAILURE - Generic failure"
-                            )
-                        }
-
-                        SmsManager.RESULT_ERROR_NO_SERVICE -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: RESULT_ERROR_NO_SERVICE - No service available"
-                            )
-                        }
-
-                        SmsManager.RESULT_ERROR_NULL_PDU -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: RESULT_ERROR_NULL_PDU - Null PDU"
-                            )
-                        }
-
-                        SmsManager.RESULT_ERROR_RADIO_OFF -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: RESULT_ERROR_RADIO_OFF - Radio is off (Airplane mode?)"
-                            )
-                        }
-
-                        SmsManager.RESULT_ERROR_LIMIT_EXCEEDED -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: RESULT_ERROR_LIMIT_EXCEEDED - SMS limit exceeded"
-                            )
-                        }
-
-                        SmsManager.RESULT_ERROR_SHORT_CODE_NOT_ALLOWED -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: RESULT_ERROR_SHORT_CODE_NOT_ALLOWED - Short code not allowed"
-                            )
-                        }
-
-                        SmsManager.RESULT_ERROR_SHORT_CODE_NEVER_ALLOWED -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: RESULT_ERROR_SHORT_CODE_NEVER_ALLOWED - Short code never allowed"
-                            )
-                        }
-
-                        SmsManager.RESULT_RADIO_NOT_AVAILABLE -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: RESULT_RADIO_NOT_AVAILABLE - Radio not available"
-                            )
-                        }
-
-                        SmsManager.RESULT_NETWORK_REJECT -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: RESULT_NETWORK_REJECT - Network rejected"
-                            )
-                        }
-
-                        SmsManager.RESULT_INVALID_ARGUMENTS -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: RESULT_INVALID_ARGUMENTS - Invalid arguments"
-                            )
-                        }
-
-                        SmsManager.RESULT_INVALID_STATE -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: RESULT_INVALID_STATE - Invalid state"
-                            )
-                        }
-
-                        SmsManager.RESULT_NO_MEMORY -> {
-                            Logger.e("SmsReceiver", "SMS send failed: RESULT_NO_MEMORY - No memory")
-                        }
-
-                        SmsManager.RESULT_INVALID_SMS_FORMAT -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: RESULT_INVALID_SMS_FORMAT - Invalid SMS format"
-                            )
-                        }
-
-                        SmsManager.RESULT_SYSTEM_ERROR -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: RESULT_SYSTEM_ERROR - System error"
-                            )
-                        }
-
-                        SmsManager.RESULT_MODEM_ERROR -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: RESULT_MODEM_ERROR - Modem error"
-                            )
-                        }
-
-                        SmsManager.RESULT_NETWORK_ERROR -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: RESULT_NETWORK_ERROR - Network error"
-                            )
-                        }
-
-                        SmsManager.RESULT_ENCODING_ERROR -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: RESULT_ENCODING_ERROR - Encoding error"
-                            )
-                        }
-
-                        SmsManager.RESULT_INVALID_SMSC_ADDRESS -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: RESULT_INVALID_SMSC_ADDRESS - Invalid SMSC address"
-                            )
-                        }
-
-                        SmsManager.RESULT_OPERATION_NOT_ALLOWED -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: RESULT_OPERATION_NOT_ALLOWED - Operation not allowed"
-                            )
-                        }
-
-                        SmsManager.RESULT_INTERNAL_ERROR -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: RESULT_INTERNAL_ERROR - Internal error"
-                            )
-                        }
-
-                        SmsManager.RESULT_NO_RESOURCES -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: RESULT_NO_RESOURCES - No resources"
-                            )
-                        }
-
-                        SmsManager.RESULT_CANCELLED -> {
-                            Logger.w("SmsReceiver", "SMS send cancelled: RESULT_CANCELLED")
-                        }
-
-                        SmsManager.RESULT_REQUEST_NOT_SUPPORTED -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: RESULT_REQUEST_NOT_SUPPORTED - Request not supported"
-                            )
-                        }
-
-                        else -> {
-                            Logger.e(
-                                "SmsReceiver",
-                                "SMS send failed: Unknown result code: $resultCode"
-                            )
-                        }
+                        context?.unregisterReceiver(this)
                     }
-                    context?.unregisterReceiver(this)
                 }
+                context.registerReceiver(
+                    sentReceiver,
+                    IntentFilter("SMS_SENT_$i"),
+                    Context.RECEIVER_NOT_EXPORTED
+                )
             }
 
-            val deliveredReceiver = object : BroadcastReceiver() {
-                override fun onReceive(context: Context?, intent: Intent?) {
-                    when (resultCode) {
-                        android.app.Activity.RESULT_OK -> {
-                            Logger.i(
-                                "SmsReceiver",
-                                "SMS delivered successfully to $destinationNumber"
-                            )
-                        }
+            // Register receivers for delivery status
+            for (i in 0 until partsCount) {
+                val deliveredReceiver = object : BroadcastReceiver() {
+                    override fun onReceive(context: Context?, intent: Intent?) {
+                        deliveredPartsCount++
+                        when (resultCode) {
+                            android.app.Activity.RESULT_OK -> {
+                                Logger.i(
+                                    "SmsReceiver",
+                                    "SMS part ${i + 1}/$partsCount delivered successfully"
+                                )
+                                if (deliveredPartsCount == partsCount) {
+                                    Logger.i(
+                                        "SmsReceiver",
+                                        "All SMS parts delivered successfully to $destinationNumber"
+                                    )
+                                }
+                            }
 
-                        android.app.Activity.RESULT_CANCELED -> {
-                            Logger.w(
-                                "SmsReceiver",
-                                "SMS delivery failed or cancelled for $destinationNumber"
-                            )
-                        }
+                            android.app.Activity.RESULT_CANCELED -> {
+                                Logger.w(
+                                    "SmsReceiver",
+                                    "SMS part ${i + 1}/$partsCount delivery failed"
+                                )
+                            }
 
-                        else -> {
-                            Logger.w("SmsReceiver", "SMS delivery status unknown: $resultCode")
+                            else -> {
+                                Logger.w(
+                                    "SmsReceiver",
+                                    "SMS part ${i + 1}/$partsCount delivery status unknown: $resultCode"
+                                )
+                            }
                         }
+                        context?.unregisterReceiver(this)
                     }
-                    context?.unregisterReceiver(this)
                 }
+                context.registerReceiver(
+                    deliveredReceiver,
+                    IntentFilter("SMS_DELIVERED_$i"),
+                    Context.RECEIVER_NOT_EXPORTED
+                )
             }
 
-            context.registerReceiver(
-                sentReceiver,
-                IntentFilter("SMS_SENT"),
-                Context.RECEIVER_NOT_EXPORTED
-            )
-            context.registerReceiver(
-                deliveredReceiver,
-                IntentFilter("SMS_DELIVERED"),
-                Context.RECEIVER_NOT_EXPORTED
-            )
-
-            smsManager.sendTextMessage(
+            // Envoyer le message (divisé en plusieurs parties si nécessaire)
+            smsManager.sendMultipartTextMessage(
                 destinationNumber,
                 null,
-                forwardedMessage,
-                sentPendingIntent,
-                deliveredPendingIntent
+                parts,
+                sentIntents,
+                deliveredIntents
             )
 
-            Logger.i("SmsReceiver", "SMS send request submitted to system")
+            Logger.i("SmsReceiver", "SMS send request submitted to system ($partsCount part(s))")
             true
         } catch (e: SecurityException) {
             Logger.e("SmsReceiver", "Permission denied while sending SMS", e)
