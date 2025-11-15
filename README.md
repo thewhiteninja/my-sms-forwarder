@@ -1,4 +1,4 @@
-# My SMS Forwarder
+# <img src="https://raw.githubusercontent.com/thewhiteninja/my-sms-forwarder/refs/heads/main/app/src/main/ic_launcher-playstore.png" style='width:1.65ex;' /> My SMS Forwarder
 
 An Android application that automatically forwards incoming SMS messages based on customizable filters.
 
