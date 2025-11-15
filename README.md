@@ -2,11 +2,9 @@
 
 An Android application that automatically forwards incoming SMS messages based on customizable filters.
 
-<img src="https://raw.githubusercontent.com/thewhiteninja/my-sms-forwarder/refs/heads/main/images/filters.jpg" style="width:32%; display:inline-block;"  alt=""/>
-<img src="https://raw.githubusercontent.com/thewhiteninja/my-sms-forwarder/refs/heads/main/images/history.jpg" style="width:32%; display:inline-block;"  alt=""/>
-<img src="https://raw.githubusercontent.com/thewhiteninja/my-sms-forwarder/refs/heads/main/images/logs.jpg" style="width:32%; display:inline-block;"  alt=""/>
+<img src="https://raw.githubusercontent.com/thewhiteninja/my-sms-forwarder/refs/heads/main/images/filters.jpg" style="width:32%; display:inline-block;"  alt=""/> <img src="https://raw.githubusercontent.com/thewhiteninja/my-sms-forwarder/refs/heads/main/images/history.jpg" style="width:32%; display:inline-block;"  alt=""/> <img src="https://raw.githubusercontent.com/thewhiteninja/my-sms-forwarder/refs/heads/main/images/logs.jpg" style="width:32%; display:inline-block;"  alt=""/>
 
-## Features
+## <img src="https://raw.githubusercontent.com/feathericons/feather/master/icons/layers.svg" width="20" /> Features
 
 - Create filters to forward SMS from specific phone numbers or sender names
 - Automatic forwarding when matching SMS are received
@@ -15,12 +13,12 @@ An Android application that automatically forwards incoming SMS messages based o
 - Receive notifications for each forwarded message
 - Persistent storage using Room database
 
-## Requirements
+## <img src="https://raw.githubusercontent.com/feathericons/feather/master/icons/cpu.svg" width="20" /> Requirements
 
 - Android 8.0 (API 26) or higher
 - Notification permissions (Android 13+)
 
-## Permissions
+## <img src="https://raw.githubusercontent.com/feathericons/feather/master/icons/shield.svg" width="20" /> Permissions
 
 The app requires several sensitive permissions:
 
@@ -31,10 +29,10 @@ The app requires several sensitive permissions:
 
 All permissions must be granted for the app to function properly.
 
-## Privacy
+## <img src="https://raw.githubusercontent.com/feathericons/feather/master/icons/lock.svg" width="20" /> Privacy
 
 This app processes SMS messages locally on your device. No data is transmitted to external servers. All filtering and forwarding happens on-device only.
 
-## License
+## <img src="https://raw.githubusercontent.com/feathericons/feather/master/icons/file-text.svg" width="20" /> License
 
 See LICENSE file.
