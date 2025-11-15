@@ -2,6 +2,10 @@
 
 An Android application that automatically forwards incoming SMS messages based on customizable filters.
 
+<img src="https://raw.githubusercontent.com/thewhiteninja/my-sms-forwarder/refs/heads/main/images/filters.jpg" style="width:32%; display:inline-block;"  alt=""/>
+<img src="https://raw.githubusercontent.com/thewhiteninja/my-sms-forwarder/refs/heads/main/images/history.jpg" style="width:32%; display:inline-block;"  alt=""/>
+<img src="https://raw.githubusercontent.com/thewhiteninja/my-sms-forwarder/refs/heads/main/images/logs.jpg" style="width:32%; display:inline-block;"  alt=""/>
+
 ## Features
 
 - Create filters to forward SMS from specific phone numbers or sender names
